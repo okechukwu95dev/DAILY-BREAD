@@ -80,7 +80,7 @@ jobs:
         UPDATE_TYPE: ${{ github.event.inputs.update_type || 'current_season' }}
       run: |
         echo "🚀 Starting database update: $UPDATE_TYPE"
-        cd github_automation/scripts
+        cd github/scripts
         
         # Run the appropriate update script based on input
         case "$UPDATE_TYPE" in
@@ -102,16 +102,16 @@ jobs:
     - name: Validate database
       run: |
         echo "✅ Validating updated database..."
-        python github_automation/scripts/validate_database.py
+        python github/scripts/validate_database.py
         
     - name: Generate update report
       run: |
         echo "📋 Generating update report..."
-        python github_automation/scripts/generate_report.py > github_automation/scripts/update_report.txt
+        python github/scripts/generate_report.py > github/scripts/update_report.txt
         
         # Show summary
         echo "=== UPDATE SUMMARY ==="
-        cat github_automation/scripts/update_report.txt
+        cat github/scripts/update_report.txt
         
     - name: Commit database changes
       run: |
@@ -121,7 +121,7 @@ jobs:
         
         # Add the updated database
         git add new_project/db/soccer_data_colab.db
-        git add github_automation/scripts/update_report.txt
+        git add github/scripts/update_report.txt
         
         # Check if there are changes to commit
         if git diff --staged --quiet; then
@@ -155,7 +155,7 @@ jobs:
           
         files: |
           new_project/db/soccer_data_colab.db
-          github_automation/scripts/update_report.txt
+          github/scripts/update_report.txt
         
     - name: Notify on failure
       if: failure()
