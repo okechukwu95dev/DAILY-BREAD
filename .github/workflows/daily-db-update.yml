@@ -41,18 +41,39 @@ jobs:
         # Try to download existing database from latest release
         echo "🔍 Checking for existing database in releases..."
         
-        # Get latest release with database
-        LATEST_DB=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
-          jq -r '.assets[] | select(.name == "soccer_data_colab.db") | .browser_download_url // empty')
+        # Create directories if they don't exist
+        mkdir -p new_project/db
+        mkdir -p new_project/db_automation
         
-        if [ -n "$LATEST_DB" ]; then
-          echo "📥 Downloading existing database from release..."
-          wget -O new_project/db/soccer_data_colab.db "$LATEST_DB"
-        else
-          echo "📁 No existing database found, will create new one"
-          # Create empty database with schema
-          python new_project/db_automation/create_schema.py
-        fi
+        # Use Python to check for existing database in releases
+        python3 << 'EOF'
+        import requests
+        import os
+        import sys
+        
+        try:
+            # Get latest release
+            url = f"https://api.github.com/repos/${{ github.repository }}/releases/latest"
+            response = requests.get(url)
+            
+            if response.status_code == 200:
+                release = response.json()
+                # Look for database file in assets
+                for asset in release.get('assets', []):
+                    if asset['name'] == 'soccer_data_colab.db':
+                        print(f"📥 Downloading existing database from release...")
+                        db_response = requests.get(asset['browser_download_url'])
+                        with open('new_project/db/soccer_data_colab.db', 'wb') as f:
+                            f.write(db_response.content)
+                        print("✅ Database downloaded successfully")
+                        sys.exit(0)
+            
+            print("📁 No existing database found, will create new one")
+            
+        except Exception as e:
+            print(f"⚠️  Error checking releases: {e}")
+            print("📁 Will create new database")
+        EOF
         
     - name: Run database update
       env:
