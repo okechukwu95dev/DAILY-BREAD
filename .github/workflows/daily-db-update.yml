@@ -1,0 +1,145 @@
+name: Daily Database Update
+
+on:
+  schedule:
+    # Run daily at 6:00 AM UTC (2:00 AM EST, 7:00 AM CET)
+    - cron: '0 6 * * *'
+  
+  # Allow manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      update_type:
+        description: 'Type of update to run'
+        required: false
+        default: 'current_season'
+        type: choice
+        options:
+          - current_season
+          - full_refresh
+          - competitions_only
+
+jobs:
+  update-database:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests sqlite3 pandas
+        
+    - name: Download current database
+      run: |
+        # Try to download existing database from latest release
+        echo "🔍 Checking for existing database in releases..."
+        
+        # Get latest release with database
+        LATEST_DB=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest" | \
+          jq -r '.assets[] | select(.name == "soccer_data_colab.db") | .browser_download_url // empty')
+        
+        if [ -n "$LATEST_DB" ]; then
+          echo "📥 Downloading existing database from release..."
+          wget -O new_project/db/soccer_data_colab.db "$LATEST_DB"
+        else
+          echo "📁 No existing database found, will create new one"
+          # Create empty database with schema
+          python new_project/db_automation/create_schema.py
+        fi
+        
+    - name: Run database update
+      env:
+        UPDATE_TYPE: ${{ github.event.inputs.update_type || 'current_season' }}
+      run: |
+        echo "🚀 Starting database update: $UPDATE_TYPE"
+        cd new_project/db_automation
+        
+        # Run the appropriate update script based on input
+        case "$UPDATE_TYPE" in
+          "current_season")
+            echo "📊 Updating current season data..."
+            python update_current_season.py
+            ;;
+          "full_refresh")
+            echo "🔄 Full database refresh..."
+            python full_refresh.py
+            ;;
+          "competitions_only")
+            echo "🏆 Updating competitions only..."
+            python update_competitions.py
+            ;;
+        esac
+        
+    - name: Validate database
+      run: |
+        echo "✅ Validating updated database..."
+        cd new_project
+        python db_automation/validate_database.py
+        
+    - name: Generate update report
+      run: |
+        echo "📋 Generating update report..."
+        cd new_project
+        python db_automation/generate_report.py > db_automation/update_report.txt
+        
+        # Show summary
+        echo "=== UPDATE SUMMARY ==="
+        cat db_automation/update_report.txt
+        
+    - name: Commit database changes
+      run: |
+        # Configure git
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # Add the updated database
+        git add new_project/db/soccer_data_colab.db
+        git add new_project/db_automation/update_report.txt
+        
+        # Check if there are changes to commit
+        if git diff --staged --quiet; then
+          echo "📊 No database changes detected"
+        else
+          # Commit changes
+          git commit -m "🤖 Daily database update - $(date +'%Y-%m-%d %H:%M UTC')"
+          git push
+          echo "✅ Database updated and pushed to repository"
+        fi
+        
+    - name: Create release with updated database
+      if: github.event_name == 'schedule' || github.event.inputs.update_type == 'full_refresh'
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: db-${{ github.run_number }}
+        name: Database Update ${{ github.run_number }}
+        body: |
+          🤖 Automated database update
+          
+          **Update Time:** $(date +'%Y-%m-%d %H:%M UTC')
+          **Type:** ${{ github.event.inputs.update_type || 'current_season' }}
+          
+          ### Changes:
+          - Updated current season team standings
+          - Refreshed team-competition relationships
+          - Validated data integrity
+          
+          ### Usage:
+          Download `soccer_data_colab.db` and place in your `new_project/db/` folder
+          
+        files: |
+          new_project/db/soccer_data_colab.db
+          new_project/db_automation/update_report.txt
+        
+    - name: Notify on failure
+      if: failure()
+      run: |
+        echo "❌ Database update failed!"
+        echo "Check the logs above for error details."
+        # Could add Slack/Discord notification here if needed
