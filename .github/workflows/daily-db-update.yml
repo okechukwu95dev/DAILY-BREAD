@@ -108,16 +108,18 @@ jobs:
     - name: Validate database
       run: |
         echo "✅ Validating updated database..."
-        python .github/scripts/validate_database.py
+        cd .github/scripts
+        python validate_database.py
         
     - name: Generate update report
       run: |
         echo "📋 Generating update report..."
-        python .github/scripts/generate_report.py > .github/scripts/update_report.txt
+        cd .github/scripts
+        python generate_report.py > update_report.txt
         
         # Show summary
         echo "=== UPDATE SUMMARY ==="
-        cat .github/scripts/update_report.txt
+        cat update_report.txt
         
     - name: Commit database changes
       run: |
