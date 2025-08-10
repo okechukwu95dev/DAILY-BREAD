@@ -80,7 +80,7 @@ jobs:
         UPDATE_TYPE: ${{ github.event.inputs.update_type || 'current_season' }}
       run: |
         echo "🚀 Starting database update: $UPDATE_TYPE"
-        cd new_project/db_automation
+        cd github_automation/scripts
         
         # Run the appropriate update script based on input
         case "$UPDATE_TYPE" in
@@ -90,29 +90,28 @@ jobs:
             ;;
           "full_refresh")
             echo "🔄 Full database refresh..."
-            python full_refresh.py
+            python create_schema.py
+            python update_current_season.py
             ;;
           "competitions_only")
             echo "🏆 Updating competitions only..."
-            python update_competitions.py
+            python update_current_season.py
             ;;
         esac
         
     - name: Validate database
       run: |
         echo "✅ Validating updated database..."
-        cd new_project
-        python db_automation/validate_database.py
+        python github_automation/scripts/validate_database.py
         
     - name: Generate update report
       run: |
         echo "📋 Generating update report..."
-        cd new_project
-        python db_automation/generate_report.py > db_automation/update_report.txt
+        python github_automation/scripts/generate_report.py > github_automation/scripts/update_report.txt
         
         # Show summary
         echo "=== UPDATE SUMMARY ==="
-        cat db_automation/update_report.txt
+        cat github_automation/scripts/update_report.txt
         
     - name: Commit database changes
       run: |
@@ -122,7 +121,7 @@ jobs:
         
         # Add the updated database
         git add new_project/db/soccer_data_colab.db
-        git add new_project/db_automation/update_report.txt
+        git add github_automation/scripts/update_report.txt
         
         # Check if there are changes to commit
         if git diff --staged --quiet; then
@@ -156,7 +155,7 @@ jobs:
           
         files: |
           new_project/db/soccer_data_colab.db
-          new_project/db_automation/update_report.txt
+          github_automation/scripts/update_report.txt
         
     - name: Notify on failure
       if: failure()
