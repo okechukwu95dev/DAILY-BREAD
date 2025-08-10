@@ -82,6 +82,12 @@ jobs:
         echo "🚀 Starting database update: $UPDATE_TYPE"
         cd .github/scripts
         
+        # Check if database exists, if not create it first
+        if [ ! -f "../../new_project/db/soccer_data_colab.db" ]; then
+          echo "📁 Database not found, creating new database..."
+          python create_schema.py
+        fi
+        
         # Run the appropriate update script based on input
         case "$UPDATE_TYPE" in
           "current_season")
