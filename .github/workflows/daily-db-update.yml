@@ -97,13 +97,21 @@ jobs:
           "full_refresh")
             echo "🔄 Full database refresh..."
             python create_schema.py
-            python update_current_season.py
+            python full_database_population.py
             ;;
           "competitions_only")
             echo "🏆 Updating competitions only..."
             python update_current_season.py
             ;;
         esac
+    - name: Debug DB file state
+      run: |
+        echo "📂 GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
+        echo "📁 Listing new_project/db contents (if any)..."
+        ls -al new_project/db || echo "(directory missing)"
+        echo "🔎 Searching for soccer_data_colab.db..."
+        find . -maxdepth 4 -name soccer_data_colab.db -printf '%p %k KB\n' || true
+        echo "PWD after update step: $(pwd)"
         
     - name: Validate database
       run: |
